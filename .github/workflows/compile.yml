@@ -1,31 +1,56 @@
-name: Build U-Boot
-on: [push, workflow_dispatch]
+name: Build-Custom-Nor16M
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
+    name: Build CV300 U-Boot
     runs-on: ubuntu-22.04
+
     steps:
-      - name: Checkout repo
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libncurses5-dev lzma libssl-dev libncurses5
+          sudo apt-get install -y build-essential bison flex libssl-dev libncurses5-dev device-tree-compiler bc libc6-i386
 
-      - name: Download Toolchain
+      - name: Download HiSilicon toolchain
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          wget -q https://github.com || wget -q https://github.com
-          sudo tar -xf arm-hisiv510-linux.tar.xz -C /opt/
-          echo "/opt/arm-hisiv510-linux/bin" >> $GITHUB_PATH
+          gh release download v1 -R OpenIPC/toolchains -p 'arm-hisiv500-linux.tgz'
+          tar -xzf arm-hisiv500-linux.tgz
+          tar -xjf arm-hisiv500-linux/arm-hisiv500-linux.tar.bz2 -C arm-hisiv500-linux/ --strip-components=1 || true
+          echo "$GITHUB_WORKSPACE/arm-hisiv500-linux/bin" >> $GITHUB_PATH
 
-      - name: Compile U-Boot
+      - name: Build CV300 mini-boot
         run: |
-          chmod +x build.sh
-          ./build.sh
+          set -euxo pipefail
+          export ARCH=arm
+          export CROSS_COMPILE=arm-hisiv500-linux-uclibcgnueabi-
 
-      - name: Upload Artifact
+          make clean
+          make hi3516cv300_config
+          cp reg_info_hi3516cv300.bin .reg
+          make -j$(nproc)
+          make mini-boot.bin
+
+          cp mini-boot.bin u-boot-hi3516cv300-universal.bin
+          size=$(stat -c %s u-boot-hi3516cv300-universal.bin)
+          echo "Binary size: ${size} bytes"
+          test "$size" -le 262144
+
+      - name: Upload CV300 U-Boot
         uses: actions/upload-artifact@v4
         with:
-          name: u-boot-binaries
-          path: "*.bin"
+          name: u-boot-hi3516cv300-universal
+          path: u-boot-hi3516cv300-universal.bin
+          if-no-files-found: error
