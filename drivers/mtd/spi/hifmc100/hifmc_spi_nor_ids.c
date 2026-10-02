@@ -2669,6 +2669,25 @@ static struct spi_nor_info hifmc_spi_nor_info_table[] = {
         &spi_driver_no_qe,
     },
 
+    {
+        "BY25Q128AS",  {0x68, 0x40, 0x18}, 3, _16M,   _64K, 3,
+        {
+            &READ_STD(0, INFINITE, 50),
+            0
+        },
+
+        {
+            &WRITE_STD(0, 256, 80),
+            0
+        },
+
+        {
+            &ERASE_SECTOR_64K(0, _64K, 80),
+            0
+        },
+        &spi_driver_no_qe,
+    },
+
 	{0, {0}, 0, 0, 0, 0, {0}, {0}, {0}, NULL},
 };
 
